@@ -1,0 +1,699 @@
+#set position of window
+import os
+os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (400,100)
+
+#set up pygame
+import pygame, sys
+from pygame.locals import *
+
+pygame.init()
+FPS = 30
+fpsClock = pygame.time.Clock()
+
+#set up window
+DISPLAYSURF = pygame.display.set_mode((600,600))
+pygame.display.set_caption('Project 2')
+
+#variables
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+RED = (255, 0, 0)
+GREEN = (0, 255, 0)
+BLUE = (0,0,255)
+
+#player class
+class Player:
+
+    def __init__(self):
+        self.maxHealth = 10
+        self.Health = 5
+        self.maxSpeed = 8
+        self.Speed = 5
+        self.X = 275
+        self.Y = 275
+        self.playerBox = ()
+
+        #weapon
+        self.Damage = 1
+        self.FireRate = 5
+        self.ShotSpeed = 20
+        
+    def __del__(self):
+        return
+
+    #call player.display() to put the player sprite on screen
+    def display(self):
+        return pygame.draw.rect(DISPLAYSURF, BLACK, (self.X, self.Y, 50, 50))
+
+    def GunDisplay(self,direction):
+        if direction == 'left':
+            return pygame.draw.rect(DISPLAYSURF, BLUE, (self.X-5, self.Y+25, 5,5))
+        elif direction == 'right':
+            return pygame.draw.rect(DISPLAYSURF, BLUE, (self.X+50, self.Y+25, 5,5))
+        elif direction == 'up':
+            return pygame.draw.rect(DISPLAYSURF, BLUE, (self.X+25, self.Y-5, 5,5))
+        elif direction == 'down':
+            return pygame.draw.rect(DISPLAYSURF, BLUE, (self.X+25, self.Y+50, 5,5))
+
+    #updates coordinates of player sprite ( player.move('left', 'down') )
+    def move(self, x, y):
+        if x == 'left':
+            self.X -= self.Speed
+            if self.X < 50:
+                self.X = 50
+        if x == 'right':
+            self.X += self.Speed
+            if self.X > 500:
+                self.X = 500
+        if y == 'up':
+            self.Y -= self.Speed
+            if self.Y < 50:
+                self.Y = 50
+        if y == 'down':
+            self.Y += self.Speed
+            if self.Y > 500:
+                self.Y = 500
+
+    #adds 1 to player health
+    def addHealth(self):
+        if self.Health < self.maxHealth:
+            self.Health += 1
+
+    #creats a Rect of the player in ((left, top), (right, bottom)) form
+    def Box(self):
+        self.playerBox = ((self.X, self.Y),(self.X+50, self.Y+50))
+        return self.playerBox
+            
+class Enemy:
+
+    def __init__(self,x,y,entrance):
+        self.X = x
+        self.Y = y
+        self.EnemyBox = ()
+        self.entrance = entrance
+
+    def __del__(self):
+        return
+
+    def subHealth(self, damage):
+        if self.Health - damage > 0:
+            self.Health -= damage
+        else:
+            self.Health = 0
+
+
+class NormalEnemy(Enemy):
+
+    def __init__(self,x,y,entrance, color):
+        Enemy.__init__(self,x,y,entrance)
+        self.Health = 3
+        self.Damage = 1
+        self.Speed = 2
+        self.color = color
+
+    def __del__(self):
+        return
+
+    def display(self):
+        return pygame.draw.rect(DISPLAYSURF, self.color, (self.X, self.Y, 25, 25))
+
+    def Box(self):
+        self.EnemyBox = ((self.X, self.Y),(self.X+25,self.Y+25))
+        return self.EnemyBox
+
+    def Follow(self,x,y):
+        #always trying to get its coordinates equal to the players
+        if x+10<self.X:
+            self.X-=self.Speed
+
+        if x+10>self.X:
+            self.X+=self.Speed
+
+        if y+10<self.Y:
+            self.Y-=self.Speed
+
+        if y+10>self.Y:
+            self.Y+=self.Speed
+
+        #stops enemies from moving through walls when entering room
+        if self.entrance == 1:
+            if self.X<50:
+                if self.Y<275:
+                    self.Y = 275
+                if self.Y>300:
+                    self.Y = 300
+        if self.entrance == 2:
+            if self.Y>525:
+                if self.X<275:
+                    self.X = 275
+                if self.X>300:
+                    self.X = 300
+        if self.entrance == 3:
+            if self.X>525:
+                if self.Y<275:
+                    self.Y = 275
+                if self.Y>300:
+                    self.Y = 300
+        if self.entrance == 4:
+            if self.Y<50:
+                if self.X<275:
+                    self.X = 275
+                if self.X>300:
+                    self.X = 300
+
+
+class BouncingEnemy(Enemy):
+
+    def __init__(self,x,y,entrance, color):
+        Enemy.__init__(self,x,y,entrance)
+        self.Health = 2
+        self.Damage = 1
+        self.Speed = 3
+        self.Entering = True
+        self.color = color
+        #initial MoveDirection
+        if entrance == 1:
+            self.MoveDirection = 'DOWNRIGHT'
+        elif entrance == 2:
+            self.MoveDirection = 'UPRIGHT'
+        elif entrance == 3:
+            self.MoveDirection = 'UPLEFT'
+        elif entrance == 4:
+            self.MoveDirection = 'DOWNLEFT'
+
+    def __del__(self):
+        return
+
+    def display(self):
+         return pygame.draw.rect(DISPLAYSURF, self.color, (self.X, self.Y, 25, 25))
+
+    def Box(self):
+        self.EnemyBox = ((self.X, self.Y),(self.X+25,self.Y+25))
+        return self.EnemyBox
+
+    def Move(self):
+        #entering is true if the enemy is still in an entrance
+        if self.Entering:
+            if self.entrance == 1:
+                if self.X<50:
+                    if self.Y<275:
+                        self.MoveDirection = 'DOWNRIGHT'
+                    elif self.Y>300:
+                        self.MoveDirection = 'UPRIGHT'
+                else:
+                    self.Entering = False
+            elif self.entrance == 2:
+                if self.Y>525:
+                    if self.X<275:
+                        self.MoveDirection = 'UPRIGHT'
+                    elif self.X>300:
+                        self.MoveDirection = 'UPLEFT'
+                else:
+                    self.Entering = False
+            elif self.entrance == 3:
+                if self.X>525:
+                    if self.Y<275:
+                        self.MoveDirection = 'DOWNLEFT'
+                    elif self.Y>300:
+                        self.MoveDirection = 'UPLEFT'
+                else:
+                    self.Entering = False
+            elif self.entrance == 4:
+                if self.Y<50:
+                    if self.X<275:
+                        self.MoveDirection = 'DOWNRIGHT'
+                    elif self.X>300:
+                        self.MoveDirection = 'DOWNLEFT'
+                else:
+                    self.Entering = False
+        #once the enemy has got through an entrance it will bounce off walls
+        else:
+            if self.X < 50:
+                if self.MoveDirection == 'DOWNLEFT':
+                    self.MoveDirection = 'DOWNRIGHT'
+                else:
+                    self.MoveDirection = 'UPRIGHT'
+
+            elif self.X > 525:
+                if self.MoveDirection == 'DOWNRIGHT':
+                    self.MoveDirection = 'DOWNLEFT'
+                else:
+                    self.MoveDirection = 'UPLEFT'
+
+            if self.Y < 50:
+                if self.MoveDirection == 'UPLEFT':
+                    self.MoveDirection = 'DOWNLEFT'
+                else:
+                    self.MoveDirection = 'DOWNRIGHT'
+
+            elif self.Y > 525:
+                if self.MoveDirection == 'DOWNLEFT':
+                    self.MoveDirection = 'UPLEFT'
+                else:
+                    self.MoveDirection = 'UPRIGHT'
+
+        #takes MoveDirection and adjusts coordinates
+        if self.MoveDirection == 'DOWNLEFT':
+            self.X -= self.Speed+1
+            self.Y += self.Speed
+
+        elif self.MoveDirection == 'DOWNRIGHT':
+            self.X += self.Speed+1
+            self.Y += self.Speed
+
+        elif self.MoveDirection == 'UPLEFT':
+            self.X -= self.Speed+1
+            self.Y -= self.Speed
+
+        elif self.MoveDirection == 'UPRIGHT':
+            self.X += self.Speed+1
+            self.Y -= self.Speed
+
+
+class bullet:
+
+    def __init__(self,x,y,speed,direction):
+        self.X = x+25
+        self.Y = y+25
+        self.ShotSpeed = speed
+        self.direction = direction
+        self.BulletBox = ()
+
+    def __del__(self):
+        return
+
+    def move(self):
+        if self.direction == 'left':
+            self.X-=self.ShotSpeed        
+        if self.direction == 'right':
+            self.X+=self.ShotSpeed
+        if self.direction =='up':
+            self.Y-=self.ShotSpeed
+        if self.direction == 'down':
+            self.Y+=self.ShotSpeed
+
+    #displays bullet, changing shape depending on the direction it is shot in
+    def display(self):
+        if self.direction == 'left' or self.direction == 'right':
+            return pygame.draw.rect(DISPLAYSURF, BLACK, (self.X, self.Y, 15, 5))
+        else:
+            return pygame.draw.rect(DISPLAYSURF, BLACK, (self.X, self.Y, 5, 15))
+
+    #hitbox for collision detection
+    def Box(self):
+        if self.direction == 'left' or self.direction == 'right':
+            self.BulletBox = ((self.X, self.Y),(self.X+15,self.Y+5))
+        if self.direction == 'up' or self.direction == 'down':
+            self.BulletBox = ((self.X, self.Y),(self.X+5,self.Y+15))
+        return self.BulletBox
+            
+class Heart:
+    def __init__(self,x,y):
+        self.X = x
+        self.Y = y
+        self.type = "Heart"
+    def __del__(self):
+        return
+    def display(self):
+        pygame.draw.rect(DISPLAYSURF, RED, (self.X,self.Y,10,10))
+    def Box(self):
+        return ((self.X,self.Y),(self.X+10,self.Y+10))
+
+class Powerup:
+    def __init__(self,x,y,kind):
+        self.X = x
+        self.Y = y
+        self.type = kind
+    def __del__(self):
+        return
+    def display(self):
+        if self.type == 'HealthUp':
+            pygame.draw.rect(DISPLAYSURF, RED, (self.X,self.Y,10,10))
+        if self.type == 'FireRateUp':
+            pygame.draw.rect(DISPLAYSURF, BLUE, (self.X,self.Y,10,10))
+    def Box(self):
+        return ((self.X,self.Y),(self.X+10,self.Y+10))
+
+
+        
+#returns true if there is an intersection between R1 and R2
+#R1 and R2 are of the form ((left,top),(right,bottom))
+def intersect(R1,R2):
+    left = max(R1[0][0],R2[0][0])
+    right = min(R1[1][0],R2[1][0])
+    top = max(R1[0][1],R2[0][1])
+    bot = min(R1[1][1],R2[1][1])
+    if (left > right) or (top > bot):
+        return False
+    else:
+        return True
+
+#variables
+directionX = ''
+directionY = ''
+ShotDirection = ''
+Bullets = []
+Enemies = []
+Items = []
+ShotTimer = 0
+ShotFired = False
+Vulnerable = True
+VulnerableTimer = 0
+EnemiesKilled = 0
+FrameCount = 0
+Pause = False
+player = Player()
+facing = 'down'
+GameState = 0
+
+
+#choose set of numbers from 1 to 4 randomly without choosing the same number
+import random
+def random_combination(r):
+    pool = (1,2,3,4)
+    n = len(pool)
+    indices = sorted(random.sample(xrange(n), r))
+    return tuple(pool[i] for i in indices)
+
+
+#Game Loop
+while True:
+    #title screen
+    if GameState == 0:
+        DISPLAYSURF.fill(BLACK)
+        DISPLAYSURF.blit(pygame.image.load('TitleOptions.png'),(200, 400))
+    #game    
+    if GameState == 1:
+        if not Pause:
+            #backround
+            DISPLAYSURF.fill(BLACK)
+
+            #level floor
+            pygame.draw.rect(DISPLAYSURF, WHITE, (50,50,500,500))
+            pygame.draw.rect(DISPLAYSURF, WHITE, (0,275,50,50))
+            pygame.draw.rect(DISPLAYSURF, WHITE, (275,550,50,50))
+            pygame.draw.rect(DISPLAYSURF, WHITE, (550,275,50,50))
+            pygame.draw.rect(DISPLAYSURF, WHITE, (275,0,50,50))
+
+   
+            SpawnNumber = 0
+            #Chooses the number of enemies that spawn at a time
+            #for the first 540 frames only 1 enemie spawns at a time, after it is then randomly chosen between 1 and 4
+            #EnemiesKilled determines when the player wins
+            if EnemiesKilled <15:
+                if (FrameCount%180 == 0) and FrameCount<540:
+                    SpawnNumber = 1
+                elif FrameCount>540 and (FrameCount%210 ==0 or FrameCount == 540):
+                    SpawnNumber = random.randint(1,4)
+            elif len(Enemies)==0:
+                GameState = 3
+
+            #adds enemies to list placed at a random entrance
+            #1<=SpawnNumber<=4
+            entrance = random_combination(SpawnNumber)
+            for i in entrance:
+                if i == 1:
+                    #25% chance to spawn a bouncing Enemy
+                    if random.randint(1,4) == 1:
+                        #10% chance to Spawn a blue bouncing enemy (drops item/powerup)
+                        if random.randint(1,100)<=10:
+                            Enemies.append(BouncingEnemy(-25,280, i, BLUE))
+                        else:
+                            Enemies.append(BouncingEnemy(-25,280, i, GREEN))
+                    #75% chance to spawn a normal enemy
+                    else:
+                        #10% chance to spawn a blue normal enemy
+                        if random.randint(1,100)<=10:
+                            Enemies.append(NormalEnemy(-25,280, i, BLUE))
+                        else:
+                            Enemies.append(NormalEnemy(-25,280, i, RED))
+                if i == 2:
+                    if random.randint(1,4) == 1:
+                        if random.randint(1,100)<=10:
+                            Enemies.append(BouncingEnemy(280,625, i, BLUE))
+                        else:
+                            Enemies.append(BouncingEnemy(280,625, i, GREEN))
+                    else:
+                        if random.randint(1,100)<=10:
+                            Enemies.append(NormalEnemy(280,625, i, BLUE))
+                        else:
+                            Enemies.append(NormalEnemy(280,625, i, RED))
+                if i == 3:
+                    if random.randint(1,4) == 1:
+                        if random.randint(1,100)<=10:
+                            Enemies.append(BouncingEnemy(625,280, i, BLUE))
+                        else:
+                            Enemies.append(BouncingEnemy(625,280, i, GREEN))
+                    else:
+                        if random.randint(1,100)<=10:
+                            Enemies.append(NormalEnemy(625,280, i, BLUE))
+                        else:
+                            Enemies.append(NormalEnemy(625,280, i, RED))
+                if i == 4:
+                    if random.randint(1,4) == 1:
+                        if random.randint(1,100)<=10:
+                            Enemies.append(BouncingEnemy(280,-25, i, BLUE))
+                        else:
+                            Enemies.append(BouncingEnemy(280,-25, i, GREEN))
+                    else:
+                        if random.randint(1,100)<=10:
+                            Enemies.append(NormalEnemy(280,-25, i, BLUE))
+                        else:
+                            Enemies.append(NormalEnemy(280,-25, i, RED))
+     
+            directionX = ''
+            directionY = ''
+            ShotDirection = ''
+
+            #player movement
+            Keys = pygame.key.get_pressed() 
+            if Keys[pygame.K_a]:
+                directionX = 'left'
+            if Keys[pygame.K_d]:
+                directionX = 'right'
+            if Keys[pygame.K_w]:
+                directionY = 'up'
+            if Keys[pygame.K_s]:
+                directionY = 'down'
+
+            #shooting
+            if Keys[pygame.K_LEFT]:
+                 ShotDirection = 'left'
+            if Keys[pygame.K_RIGHT]:
+                ShotDirection = 'right'
+            if Keys[pygame.K_UP]:
+                ShotDirection = 'up'
+            if Keys[pygame.K_DOWN]:
+                ShotDirection = 'down'
+
+            #allows for a delay between shots (FireRate)
+            if ShotDirection != '' and ShotTimer == 0:
+                Bullets.append(bullet(player.X, player.Y, player.ShotSpeed, ShotDirection))
+                ShotFired = True
+                ShotTimer = 30-2*player.FireRate    #sets a delay for when the next bullet can be created (aka Fire Rate)
+
+            if ShotTimer>0:
+                ShotTimer-=1
+
+
+            #Shooting
+            for i in range(len(Bullets)):
+                if i <= len(Bullets)-1:
+                    if Bullets[i] == None:
+                        Bullets.remove(None)
+                    else:
+                        Bullets[i].move()
+                        Bullets[i].display()
+                        #checks if bullet has hit a wall
+                        if Bullets[i].X <= 50:
+                            Bullets[i] = None
+                        elif Bullets[i].X >= 535:
+                            Bullets[i] = None
+                        elif Bullets[i].Y <= 50:
+                            Bullets[i] = None
+                        elif Bullets[i].Y >= 535:
+                            Bullets[i] = None
+                        #checks if bullet has hit an enemy
+                        for k in range (len(Enemies)):
+                            if k <= len(Enemies)-1:
+                                if Enemies[k] != None and Bullets[i] != None:
+                                    if intersect(Bullets[i].Box(),Enemies[k].Box()):    #checks if a bullet hit an enemy
+                                        Bullets[i] = None
+                                        Enemies[k].subHealth(player.Damage) #subtract enemy health by amount of damage a bullet does
+                                    if Enemies[k].Health<=0:
+                                        #if enemy is blue add either a heart or a powerup top the item list
+                                        if Enemies[k].color == BLUE:
+                                            #75% chance to add a heart to item list
+                                            if random.randint(1,4)<3:
+                                                Items.append(Heart(Enemies[k].X,Enemies[k].Y))
+                                            #25 chance to add a powerup
+                                            else:
+                                                #50/50 chance for HealthUp or FireRate
+                                                if random.randint(1,2)==1:
+                                                    Items.append(Powerup(Enemies[k].X,Enemies[k].Y,'HealthUp'))
+                                                else:
+                                                    Items.append(Powerup(Enemies[k].X,Enemies[k].Y,'FireRateUp'))            
+                                        Enemies[k] = None
+                                        EnemiesKilled+=1
+
+            for i in range (len(Enemies)):
+                if i <= len(Enemies)-1:
+                    if Enemies[i] == None:
+                        Enemies.remove(None)
+                    else:
+                        #if Enemies[i] is a BouncingEnemy try: will fail because that method isnt in that class so it will do what is in except:
+                        try:
+                            Enemies[i].Follow(player.X,player.Y)
+                        except:
+                            Enemies[i].Move()
+                        Enemies[i].display()
+                        if intersect(Enemies[i].Box(), player.Box()) and Vulnerable:    #checks if an enemy touched the player and if the player hasnt just been hit
+                            player.Health-=Enemies[i].Damage #decrease player health if hit by enemy
+                            print player.Health
+                            if player.Health == 0:
+                                GameState = 2
+                            Vulnerable = False
+                            VulnerableTimer = 120  #creates a timer for how long the player is invincible
+            
+            for i in range (len(Items)):
+                if i <= len(Items)-1:
+                    Items[i].display()
+                    #if player touches item, delete that item from screen
+                    if intersect(Items[i].Box(),player.Box()):
+                        print Items[i].type
+                        Items[i] = None
+                        Items.remove(None)
+            
+            #decriments the Vulnerable timer           
+            if VulnerableTimer > 0:
+                VulnerableTimer-=1
+            if VulnerableTimer == 0:
+                Vulnerable = True
+
+            #if player is hit, the player will blink indicating he can not be hurt 
+            if not Vulnerable and VulnerableTimer%10==0:
+                pass
+            else:
+                player.display()
+                if ShotDirection != '':
+                    facing = ShotDirection
+                elif directionY != '':
+                    facing = directionY
+                elif directionX != '':
+                    facing = directionX
+                player.GunDisplay(facing)
+            player.move(directionX,directionY)
+
+            FrameCount+=1
+
+        else:
+            DISPLAYSURF.blit(pygame.image.load('Pause.png'),(200, 260))
+
+        #death screen
+        if GameState == 2:
+            DISPLAYSURF.blit(pygame.image.load('Dead.png'),(200, 260))
+        #win screen
+        if GameState == 3:
+            DISPLAYSURF.blit(pygame.image.load('Win.png'),(200, 260))
+   
+    for event in pygame.event.get():
+        
+        if event.type == QUIT:
+            pygame.quit()
+            sys.exit()
+
+        if event.type == pygame.KEYDOWN:
+            if GameState == 0:
+                if event.key == K_SPACE:
+                    GameState = 1
+                if event.key == K_ESCAPE:
+                    pygame.quit()
+                    sys.exit()
+            #game
+            if GameState == 1:
+                if Pause and event.key == K_ESCAPE:
+                    Pause = False
+                elif event.key == K_ESCAPE:
+                    Pause = True
+            #lose screen
+            if GameState == 2:
+                if event.key == K_ESCAPE:
+                    #variables
+                    directionX = ''
+                    directionY = ''
+                    ShotDirection = ''
+                    Bullets = []
+                    Enemies = []
+                    ShotTimer = 0
+                    ShotFired = False
+                    Vulnerable = True
+                    VulnerableTimer = 0
+                    EnemiesKilled = 0
+                    FrameCount = 0
+                    Pause = False
+                    player = Player()
+
+                    GameState = 0
+                if event.key == K_SPACE:
+                    #variables
+                    directionX = ''
+                    directionY = ''
+                    ShotDirection = ''
+                    Bullets = []
+                    Enemies = []
+                    Items = []
+                    ShotTimer = 0
+                    ShotFired = False
+                    Vulnerable = True
+                    VulnerableTimer = 0
+                    EnemiesKilled = 0
+                    FrameCount = 0
+                    Pause = False
+                    player = Player()
+                    facing = 'down'
+
+                    GameState = 1
+            #win screen
+            if GameState == 3:
+                if event.key == K_ESCAPE:
+                    #variables
+                    directionX = ''
+                    directionY = ''
+                    ShotDirection = ''
+                    Bullets = []
+                    Enemies = []
+                    Items = []
+                    ShotTimer = 0
+                    ShotFired = False
+                    Vulnerable = True
+                    VulnerableTimer = 0
+                    EnemiesKilled = 0
+                    FrameCount = 0
+                    Pause = False
+                    player = Player()
+                    facing = 'down'
+
+                    GameState = 0
+                if event.key == K_SPACE:
+                    #variables
+                    directionX = ''
+                    directionY = ''
+                    ShotDirection = ''
+                    Bullets = []
+                    Enemies = []
+                    Items = []
+                    ShotTimer = 0
+                    ShotFired = False
+                    Vulnerable = True
+                    VulnerableTimer = 0
+                    EnemiesKilled = 0
+                    FrameCount = 0
+                    Pause = False
+                    player = Player()
+                    facing = 'down'
+
+                    GameState = 1
+                
+    pygame.display.update()
+    pygame.display.flip()
+    fpsClock.tick(FPS)
